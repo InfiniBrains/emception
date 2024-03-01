@@ -55,7 +55,7 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
                                                                  language = "cpp",
                                                                  height = "20vh"
                                                                }) => {
-    const [cppFlags, setCppFlags] = useState("-O2 -fexceptions --proxy-to-worker -sEXIT_RUNTIME=1 -std=c++2b -fmodules");
+    const [cppFlags, setCppFlags] = useState("-O2 -fexceptions --proxy-to-worker -sEXIT_RUNTIME=1 -std=c++20");
 
   const [api, contextHolder] = notification.useNotification();
   let [consoleOutput, setConsoleOutput] = useState<string>("");
@@ -92,10 +92,10 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
 
     emception = Comlink.wrap(emceptionWorker);
 
-    emception.onstdout = Comlink.proxy(writeLineToConsole);
-    emception.onstderr = Comlink.proxy(writeLineToConsole);
-    emception.onprocessstart = Comlink.proxy(onprocessstart);
-    emception.onprocessend = Comlink.proxy(onprocessend);
+    emception.onstdout = Comlink.proxy(console.log);
+    emception.onstderr = Comlink.proxy(console.log);
+    emception.onprocessstart = Comlink.proxy(console.log);
+    emception.onprocessend = Comlink.proxy(console.log);
 
     await emception.init();
     showNotification("Emception intialized");
@@ -146,6 +146,7 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
       const cmd = `em++ ${cppFlags} -sSINGLE_FILE=1 -sUSE_CLOSURE_COMPILER=0 /working/main.cpp -o /working/main.js`;
       writeLineToConsole(`\$ ${cmd}`);
       const result = await emception.run(cmd);
+      console.log(result);
       showNotification(JSON.stringify(result));
       if (result.returncode == 0) {
         writeLineToConsole("Emception compilation finished");

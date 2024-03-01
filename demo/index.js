@@ -39,11 +39,12 @@ terminal.loadAddon(terminalFitAddon);
 window.editor = editor;
 window.terminal = terminal;
 
-editor.setValue(`import std;
+editor.setValue(`#include <iostream>
+using namespace std;
+
 int main() {
     std::printf("Hello World"); 
-}
-`);
+}`);
 
 emception.onstdout = Comlink.proxy((str) => terminal.write(str + "\n"));
 emception.onstderr = Comlink.proxy((str) => terminal.write(str + "\n"));
@@ -77,7 +78,7 @@ async function main() {
     `, document.body);
 
     const flags = document.getElementById("flags");
-    flags.value = "-O2 -fexceptions --proxy-to-worker -sEXIT_RUNTIME=1 -std=c++2b -fmodules";
+    flags.value = "-O2 -fexceptions --proxy-to-worker -sEXIT_RUNTIME=1 -std=c++20";
     
     window.split = Split({
         onDrag: () => {

@@ -21,16 +21,16 @@ cp $SRC/src/* $BUILD/emception/
 cp $SRC/src/* $BUILD/emception/
 
 mkdir -p $BUILD/emception/llvm/
-cp $BUILD/llvm/bin/llvm-box.mjs $BUILD/emception/llvm/
+cp $BUILD/llvm/bin/llvm-box.{mjs,wasm} $BUILD/emception/llvm/
 
 mkdir -p $BUILD/emception/binaryen/
-cp $BUILD/binaryen/bin/binaryen-box.mjs $BUILD/emception/binaryen/
+cp $BUILD/binaryen/bin/binaryen-box.{mjs,wasm} $BUILD/emception/binaryen/
 
 mkdir -p $BUILD/emception/quicknode/
-cp $BUILD/quicknode/quicknode.mjs $BUILD/emception/quicknode/
+cp $BUILD/quicknode/quicknode.{mjs,wasm} $BUILD/emception/quicknode/
 
 mkdir -p $BUILD/emception/cpython/
-cp $BUILD/cpython/python.mjs $BUILD/emception/cpython/
+cp $BUILD/cpython/python.{mjs,wasm} $BUILD/emception/cpython/
 
 mkdir -p $BUILD/emception/brotli/
 cp $BUILD/brotli/brotli.{mjs,wasm} $BUILD/emception/brotli/
