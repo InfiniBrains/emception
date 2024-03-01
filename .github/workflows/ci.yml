@@ -28,7 +28,6 @@ jobs:
         run: |
           ./build-with-docker.sh
 
-      # install node 14
       - uses: actions/setup-node@v2
         with:
           node-version: 16
@@ -42,6 +41,9 @@ jobs:
           else
             export RUN_PUBLISH=false
           fi
+
+      - name: Copy CNAME
+        run: cp CNAME build/demo/CNAME
 
       # deploy build/demo to gh-pages
       - name: Publish demo to gh-pages
