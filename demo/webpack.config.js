@@ -14,7 +14,7 @@ module.exports = {
     },
     resolve: {
         alias: {
-            emception: "../build/emception",
+            // emception: "../build/emception",
         },
         fallback: {
             "llvm-box.wasm": false,
@@ -31,15 +31,15 @@ module.exports = {
             title: "Emception",
         }),
         new MonacoWebpackPlugin({ languages: ["cpp"] }),
-        new CopyWebpackPlugin({
-            patterns: [{
-                from: "../build/emception/brotli/brotli.wasm",
-                to: "brotli/brotli.wasm"
-            }, {
-                from: "../build/emception/wasm-package/wasm-package.wasm",
-                to: "wasm-package/wasm-package.wasm"
-            }],
-        }),
+        // new CopyWebpackPlugin({
+            // patterns: [{
+            //     from: "../build/emception/brotli/brotli.wasm",
+            //     to: "brotli/brotli.wasm"
+            // }, {
+            //     from: "../build/emception/wasm-package/wasm-package.wasm",
+            //     to: "wasm-package/wasm-package.wasm"
+            // }],
+        // }),
         new CompressionPlugin({
             exclude: /\.br$/,
         }),

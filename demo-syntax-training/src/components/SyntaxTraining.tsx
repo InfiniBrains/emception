@@ -3,19 +3,19 @@ import {AssignmentBasev1_0_0} from "../assignments/assignment.base.v1.0.0";
 const path = require('path');
 import { CopyOutlined, PlayCircleFilled, UndoOutlined } from "@ant-design/icons";
 import { Editor } from "@monaco-editor/react";
-import { Breadcrumb, Button, Col, Layout, Menu, notification, Row, Space, Input } from "antd";
+import {Breadcrumb, Button, Col, Layout, Menu, notification, Row, Space, Input, message} from "antd";
 const { TextArea } = Input;
 
 import * as Comlink from "comlink";
 import { editor } from "monaco-editor";
 import React, {useEffect, useRef, useState} from "react";
-import Emception from "./emception";
 import { HelloWorldCPP } from "../assignments/intro-cpp/hello-world-cpp";
 import Markdown from 'markdown-to-jsx'
 
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { dark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import {write} from "node:fs";
+import Emception from "./emception";
 
 const CodeBlock = ({ children }: { children: React.ReactElement }) => {
   const { className, children: code } = children.props;
@@ -55,14 +55,17 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
                                                                  language = "cpp",
                                                                  height = "20vh"
                                                                }) => {
-    const [cppFlags, setCppFlags] = useState("-O2 -fexceptions --proxy-to-worker -sEXIT_RUNTIME=1 -std=c++20");
+  const [cppFlags, setCppFlags] = useState("-O2 -fexceptions --proxy-to-worker -sEXIT_RUNTIME=1 -std=c++20");
+
+  const [emceptionLoaded, setEmceptionLoaded] = useState(false);
 
   const [api, contextHolder] = notification.useNotification();
   let [consoleOutput, setConsoleOutput] = useState<string>("");
 
-  let emception: Emception;
+  const [emception, setEmception] = useState<Comlink.Remote<Emception> | null>(null);
 
-  const writeLineToConsole = (str: string) => {
+  const writeLineToConsole = (str: any) => {
+    console.log(str);
     consoleOutput+= str + "\n";
     console.log(consoleOutput);
     setConsoleOutput(consoleOutput);
@@ -86,18 +89,40 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
 
   async function loadEmception(): Promise<any> {
     showNotification("Loading emception...");
+    if(emceptionLoaded)
+      return;
+    setEmceptionLoaded(true);
 
+    console.log("load worker");
     // todo: is it possible to not refer as url?
     const emceptionWorker = new Worker(new URL('./emception.worker.ts', import.meta.url), { type: 'module' });
 
-    emception = Comlink.wrap(emceptionWorker);
+    emceptionWorker.onerror = (e) => {
+      console.error(e);
+      showNotification("Emception worker error");
+    }
 
-    emception.onstdout = Comlink.proxy(console.log);
-    emception.onstderr = Comlink.proxy(console.log);
-    emception.onprocessstart = Comlink.proxy(console.log);
-    emception.onprocessend = Comlink.proxy(console.log);
+    console.log("Post message to worker");
+
+    //let emception: Comlink.Remote<Emception> = Comlink.wrap(emceptionWorker);
+    let emception: Comlink.Remote<Emception> = Comlink.wrap(emceptionWorker);
+
+    console.log("Post wrap");
+
+    setEmception(emception);
+
+    console.log("Post set");
+
+    emception.onstdout.bind(console.log);
+    emception.onstderr.bind(console.log);
+    emception.onprocessstart.bind(console.log);
+    emception.onprocessend.bind(console.log);
+
+    console.log("Post bind");
 
     await emception.init();
+
+    console.log("Post init");
     showNotification("Emception intialized");
   }
 
@@ -139,8 +164,14 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
   };
 
   const onRunClick = async () => {
-    try {
+    // try {
       clearConsole();
+      if (!emception) {
+        showNotification("Emception not loaded");
+        console.log("Emception not loaded");
+        return;
+      }
+
       const code = editorRef.current?.getValue() || '';
       await emception.fileSystem.writeFile("/working/main.cpp", code);
       const cmd = `em++ ${cppFlags} -sSINGLE_FILE=1 -sUSE_CLOSURE_COMPILER=0 /working/main.cpp -o /working/main.js`;
@@ -155,10 +186,11 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
         eval(content);
       } else {
         writeLineToConsole(`Emception compilation failed`);
+        writeLineToConsole(JSON.stringify(result));
       }
-    } catch (e) {
-      writeLineToConsole(JSON.stringify(e));
-    }
+    // } catch (e) {
+    //   writeLineToConsole(JSON.stringify(e));
+    // }
   }
 
   const showNotification = (message: string) => {
