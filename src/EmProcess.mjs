@@ -132,6 +132,7 @@ export default class EmProcess extends AsyncInitializable(Process) {
             if (opts.cwd) this.cwd = opts.cwd;
             returncode = this._module._main(argc, argv);
         } catch (e) {
+            console.log("EmProcess exec result", e);
             if (typeof e === "number") {
                 returncode = -84;
             } else if ("status" in e) {

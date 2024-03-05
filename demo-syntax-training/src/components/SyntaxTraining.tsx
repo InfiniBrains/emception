@@ -59,7 +59,6 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
                                                                  language = "cpp",
                                                                  height = "20vh"
                                                                }) => {
-  const [cppFlags, setCppFlags] = useState("-O2 -fexceptions --proxy-to-worker -sEXIT_RUNTIME=1 -std=c++20");
 
   const [code, setCode] = useState(assignment.initialCode);
 
@@ -174,7 +173,7 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
 
     try {
       await emception.worker.fileSystem.writeFile("/working/main.cpp", code);
-      const cmd = `em++ ${cppFlags} -sSINGLE_FILE=1 -sMINIFY_HTML=0 -sUSE_CLOSURE_COMPILER=0 /working/main.cpp -o /working/main.js`;
+      const cmd = `em++ -O2 -fexceptions -sEXIT_RUNTIME=1 -std=c++20 -sSINGLE_FILE=1 -sUSE_CLOSURE_COMPILER=0 /working/main.cpp -o /working/main.js`;
       onprocessstart(`/emscripten/${cmd}`.split(/\s+/g));
       const result = await emception.worker.run(cmd);
       if (result.returncode == 0) {
