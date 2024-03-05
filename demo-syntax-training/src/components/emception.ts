@@ -109,6 +109,7 @@ class Emception {
     onstderr = (str) => {console.error(str)};
 
     run(...args) {
+        console.log("Running: ", args);
         if (this.fileSystem.exists("/emscripten/cache/cache.lock")) {
             this.fileSystem.unlink("/emscripten/cache/cache.lock");
         }
@@ -132,7 +133,18 @@ class Emception {
     }
 
     _run_process_impl(argv, opts:any = {}) {
-        const emscripten_script = argv[0].match(/^((\/lazy)?\/emscripten\/.+?)(?:\.py)?$/)?.[1]
+
+        // if argv[0] is an array, recreate the command line arguments
+        if (Array.isArray(argv[0])) {
+            argv = argv[0];
+            console.warn("argv[0] is an array, recreating the command line arguments. FIXME!"); // todo: fix this
+        }
+
+        console.log("pre match", argv[0])
+        const argv0 = String(argv[0]);
+        console.log("argv0", argv0) // strangely this prints "argv0" "/usr/bin/clang,--version"
+        const emscripten_script = argv0?.match(/^((\/lazy)?\/emscripten\/.+?)(?:\.py)?$/)?.[1]
+        console.log("emscripten_script", emscripten_script)
         if (emscripten_script && this.fileSystem.exists(`${emscripten_script}.py`)) {
             argv = [
                 "/usr/bin/python",
@@ -143,8 +155,11 @@ class Emception {
         }
   
         const tool_name = tools_info[argv[0]];
+
+        console.log("tool_name: ", tool_name);
         const tool = this.tools[tool_name]?.find(p => !p.running);
         if (!tool) {
+            console.log(`Emception tool not found: ${JSON.stringify(argv[0])}`);
             const result = {
                 returncode: 1,
                 stdout: "",
@@ -152,12 +167,16 @@ class Emception {
             };
             return result;
         }
+
+        console.log(`Running ${tool_name} with ${JSON.stringify(argv)}`);
   
         const result = tool.exec(argv, {
             ...opts,
             cwd: opts.cwd || "/",
             path: ["/emscripten"]
         });
+
+        console.log(`Emception tool ${tool_name} finished with ${result.returncode}`);
 
         this.fileSystem.push();
         return result;

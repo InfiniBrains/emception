@@ -49,6 +49,10 @@ interface SyntaxTrainingPageProps {
   height?: string;
 }
 
+type EmceptionWrapper = {
+  worker: Comlink.Remote<Emception> | null;
+}
+
 const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
                                                                  assignment = HelloWorldCPP,
                                                                  theme = "vs-dark",
@@ -57,12 +61,14 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
                                                                }) => {
   const [cppFlags, setCppFlags] = useState("-O2 -fexceptions --proxy-to-worker -sEXIT_RUNTIME=1 -std=c++20");
 
+  const [code, setCode] = useState(assignment.initialCode);
+
   const [emceptionLoaded, setEmceptionLoaded] = useState(false);
 
   const [api, contextHolder] = notification.useNotification();
   let [consoleOutput, setConsoleOutput] = useState<string>("");
 
-  const [emception, setEmception] = useState<Comlink.Remote<Emception> | null>(null);
+  const [emception, setEmception] = useState<EmceptionWrapper>({ worker: null });
 
   const writeLineToConsole = (str: any) => {
     console.log(str);
@@ -93,7 +99,6 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
       return;
     setEmceptionLoaded(true);
 
-    console.log("load worker");
     // todo: is it possible to not refer as url?
     const emceptionWorker = new Worker(new URL('./emception.worker.ts', import.meta.url), { type: 'module' });
 
@@ -102,23 +107,14 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
       showNotification("Emception worker error");
     }
 
-    console.log("Post message to worker");
-
-    //let emception: Comlink.Remote<Emception> = Comlink.wrap(emceptionWorker);
     let emception: Comlink.Remote<Emception> = Comlink.wrap(emceptionWorker);
 
-    console.log("Post wrap");
-
-    setEmception(emception);
-
-    console.log("Post set");
+    setEmception({ worker: emception });
 
     emception.onstdout.bind(console.log);
     emception.onstderr.bind(console.log);
     emception.onprocessstart.bind(console.log);
     emception.onprocessend.bind(console.log);
-
-    console.log("Post bind");
 
     await emception.init();
 
@@ -127,29 +123,33 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
   }
 
   useEffect(() => {
+    if(emceptionLoaded)
+      return;
     loadEmception();
+    setEmceptionLoaded(true);
   }, []);
 
-  let editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
-  let monacoRef = useRef(null);
-
-  function handleEditorChange(value: any, event: any) {
+  // todo: type corretly the event monaco.editor.IModelContentChangedEvent
+  function handleEditorChange(value: string|undefined, event: any) {
     // here is the current value
+    if (value === undefined)
+      return;
+    setCode(value);
     console.log(value);
     console.log('event', event);
   }
 
-  function handleEditorDidMount(editor: editor.IStandaloneCodeEditor, monaco: any) {
-    editorRef.current = editor;
-    monacoRef.current = monaco;
-    console.log('onMount: the editor instance:', editor);
-    console.log('onMount: the monaco instance:', monaco);
-  }
+  // function handleEditorDidMount(editor: editor.IStandaloneCodeEditor, monaco: any) {
+  //   editorRef.current = editor;
+  //   monacoRef.current = monaco;
+  //   console.log('onMount: the editor instance:', editor);
+  //   console.log('onMount: the monaco instance:', monaco);
+  // }
 
-  function handleEditorWillMount(monaco: any) {
-    monacoRef.current = monaco;
-    console.log('beforeMount: the monaco instance:', monaco);
-  }
+  // function handleEditorWillMount(monaco: any) {
+  //   monacoRef.current = monaco;
+  //   console.log('beforeMount: the monaco instance:', monaco);
+  // }
 
   function handleEditorValidation(markers: any) {
     // model markers
@@ -165,32 +165,29 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
 
   const onRunClick = async () => {
     // try {
-      clearConsole();
-      if (!emception) {
-        showNotification("Emception not loaded");
-        console.log("Emception not loaded");
-        return;
-      }
+    clearConsole();
+    if (!emception || !emception.worker) {
+      showNotification("Emception not loaded");
+      console.log("Emception not loaded");
+      return;
+    }
 
-      const code = editorRef.current?.getValue() || '';
-      await emception.fileSystem.writeFile("/working/main.cpp", code);
-      const cmd = `em++ ${cppFlags} -sSINGLE_FILE=1 -sUSE_CLOSURE_COMPILER=0 /working/main.cpp -o /working/main.js`;
-      writeLineToConsole(`\$ ${cmd}`);
-      const result = await emception.run(cmd);
-      console.log(result);
-      showNotification(JSON.stringify(result));
+    try {
+      await emception.worker.fileSystem.writeFile("/working/main.cpp", code);
+      const cmd = `em++ ${cppFlags} -sSINGLE_FILE=1 -sMINIFY_HTML=0 -sUSE_CLOSURE_COMPILER=0 /working/main.cpp -o /working/main.js`;
+      onprocessstart(`/emscripten/${cmd}`.split(/\s+/g));
+      const result = await emception.worker.run(cmd);
       if (result.returncode == 0) {
-        writeLineToConsole("Emception compilation finished");
-        const content = await emception.fileSystem.readFile("/working/main.js", { encoding: "utf8" });
-        writeLineToConsole(content);
+        const content = await emception.worker.fileSystem.readFile("/working/main.js", { encoding: "utf8" });
+        console.log(content);
         eval(content);
       } else {
-        writeLineToConsole(`Emception compilation failed`);
-        writeLineToConsole(JSON.stringify(result));
+        console.log(`Emception compilation failed`);
       }
-    // } catch (e) {
-    //   writeLineToConsole(JSON.stringify(e));
-    // }
+    } catch (err) {
+      console.error(err);
+    } finally {
+    }
   }
 
   const showNotification = (message: string) => {
@@ -205,10 +202,10 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
     label: `nav ${ index + 1 }`,
   }));
 
-  const resetCode = () => {
-    editorRef.current?.setValue(assignment.initialCode);
-    showNotification('Code reset');
-  }
+  // const resetCode = () => {
+  //   editorRef.current?.setValue(assignment.initialCode);
+  //   showNotification('Code reset');
+  // }
 
   const copyCode = async () => {
     // await navigator.clipboard.writeText(editorRef.current?.getValue() || '')
@@ -250,8 +247,6 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
                 theme={ theme }
                 defaultValue={ assignment.initialCode }
                 onChange={ handleEditorChange }
-                onMount={ handleEditorDidMount }
-                beforeMount={ handleEditorWillMount }
                 onValidate={ handleEditorValidation }
                 options={ { automaticLayout: true, wordWrap: 'on' } }
               />
@@ -262,7 +257,7 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
                   </Space>
                 </Col>
                 <Col>
-                  <Button type="default" icon={ <UndoOutlined/> } onClick={ resetCode }>Reset code</Button>
+                  {/*<Button type="default" icon={ <UndoOutlined/> } onClick={ resetCode }>Reset code</Button>*/}
                   <Button type="default" icon={ <CopyOutlined/> } onClick={ copyCode }>Copy code</Button>
                 </Col>
               </Row>
