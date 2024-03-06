@@ -92,6 +92,33 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
     );
   };
 
+  const prejs = `
+if(!window.stdin)
+    window.stdin = "";
+
+if(!window.stdout)
+    window.stdout = "";
+
+if(!window.stderr)
+    window.stderr = "";
+
+var stdinidx = 0;
+
+var Module = {
+    stdin: function() {
+        if (Module.stdinidx >= window.stdin.length)
+            return null;
+        return window.stdin.charCodeAt(Module.stdinidx++);
+    },
+    stdout: function(c) {
+        window.stdout += String.fromCharCode(c);
+    },
+    stderr: function(c) {
+        window.stderr += String.fromCharCode(c);
+    },
+};
+`;
+
   async function loadEmception(): Promise<any> {
     showNotification("Loading emception...");
     if(emceptionLoaded)
@@ -173,13 +200,21 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
 
     try {
       await emception.worker.fileSystem.writeFile("/working/main.cpp", code);
-      const cmd = `em++ -O2 -fexceptions -sEXIT_RUNTIME=1 -std=c++20 -sSINGLE_FILE=1 -sUSE_CLOSURE_COMPILER=0 /working/main.cpp -o /working/main.js`;
+      await emception.worker.fileSystem.writeFile("/working/pre.js", prejs);
+      const cmd = `em++ -O2 -fexceptions --pre-js /working/pre.js -sEXIT_RUNTIME=1 -std=c++23 -sSINGLE_FILE=1 -sUSE_CLOSURE_COMPILER=0 /working/main.cpp -o /working/main.js`;
+      // const cmd = `em++ -O2 -fexceptions -sEXIT_RUNTIME=1 -std=c++23 -sSINGLE_FILE=1 -sUSE_CLOSURE_COMPILER=0 /working/main.cpp -o /working/main.js`;
       onprocessstart(`/emscripten/${cmd}`.split(/\s+/g));
       const result = await emception.worker.run(cmd);
       if (result.returncode == 0) {
         const content = await emception.worker.fileSystem.readFile("/working/main.js", { encoding: "utf8" });
+        console.log(`Compilation succeeded`);
         console.log(content);
         eval(content);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        console.log(`eval succeeded`);
+        console.log((window as any).stdout);
+        console.error((window as any).stderr);
       } else {
         console.log(`Emception compilation failed`);
       }
