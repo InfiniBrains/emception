@@ -102,13 +102,11 @@ if(!window.stdout)
 if(!window.stderr)
     window.stderr = "";
 
-var stdinidx = 0;
-
 var Module = {
-    stdin: function() {
-        if (Module.stdinidx >= window.stdin.length)
-            return null;
-        return window.stdin.charCodeAt(Module.stdinidx++);
+    preRun: function() {
+        window.prompt = function() {
+            return window.stdin;
+        };
     },
     stdout: function(c) {
         window.stdout += String.fromCharCode(c);
@@ -209,6 +207,7 @@ var Module = {
         const content = await emception.worker.fileSystem.readFile("/working/main.js", { encoding: "utf8" });
         console.log(`Compilation succeeded`);
         console.log(content);
+        (window as any).stdin = "Tolsta";
         eval(content);
         await new Promise(resolve => setTimeout(resolve, 1000));
 
