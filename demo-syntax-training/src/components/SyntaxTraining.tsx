@@ -3,7 +3,7 @@ import {AssignmentBasev1_0_0} from "../assignments/assignment.base.v1.0.0";
 const path = require('path');
 import { CopyOutlined, PlayCircleFilled, UndoOutlined } from "@ant-design/icons";
 import { Editor } from "@monaco-editor/react";
-import {Breadcrumb, Button, Col, Layout, Menu, notification, Row, Space, Input, message} from "antd";
+import {Breadcrumb, Button, Col, Layout, Menu, notification, Row, Space, Input, message, Typography} from "antd";
 const { TextArea } = Input;
 
 import * as Comlink from "comlink";
@@ -77,6 +77,7 @@ const SyntaxTrainingPage: React.FC<SyntaxTrainingPageProps> = ({
   }
 
   const clearConsole = () => {
+    consoleOutput = "";
     setConsoleOutput("");
   }
 
@@ -153,6 +154,9 @@ var Module = {
     setEmceptionLoaded(true);
   }, []);
 
+  let editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
+  let monacoRef = useRef(null);
+
   // todo: type corretly the event monaco.editor.IModelContentChangedEvent
   function handleEditorChange(value: string|undefined, event: any) {
     // here is the current value
@@ -163,17 +167,17 @@ var Module = {
     console.log('event', event);
   }
 
-  // function handleEditorDidMount(editor: editor.IStandaloneCodeEditor, monaco: any) {
-  //   editorRef.current = editor;
-  //   monacoRef.current = monaco;
-  //   console.log('onMount: the editor instance:', editor);
-  //   console.log('onMount: the monaco instance:', monaco);
-  // }
+  function handleEditorDidMount(editor: editor.IStandaloneCodeEditor, monaco: any) {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+    console.log('onMount: the editor instance:', editor);
+    console.log('onMount: the monaco instance:', monaco);
+  }
 
-  // function handleEditorWillMount(monaco: any) {
-  //   monacoRef.current = monaco;
-  //   console.log('beforeMount: the monaco instance:', monaco);
-  // }
+  function handleEditorWillMount(monaco: any) {
+    monacoRef.current = monaco;
+    console.log('beforeMount: the monaco instance:', monaco);
+  }
 
   function handleEditorValidation(markers: any) {
     // model markers
@@ -188,7 +192,6 @@ var Module = {
   };
 
   const onRunClick = async () => {
-    // try {
     clearConsole();
     if (!emception || !emception.worker) {
       showNotification("Emception not loaded");
@@ -200,25 +203,27 @@ var Module = {
       await emception.worker.fileSystem.writeFile("/working/main.cpp", code);
       await emception.worker.fileSystem.writeFile("/working/pre.js", prejs);
       const cmd = `em++ -O2 -fexceptions --pre-js /working/pre.js -sEXIT_RUNTIME=1 -std=c++23 -sSINGLE_FILE=1 -sUSE_CLOSURE_COMPILER=0 /working/main.cpp -o /working/main.js`;
-      // const cmd = `em++ -O2 -fexceptions -sEXIT_RUNTIME=1 -std=c++23 -sSINGLE_FILE=1 -sUSE_CLOSURE_COMPILER=0 /working/main.cpp -o /working/main.js`;
       onprocessstart(`/emscripten/${cmd}`.split(/\s+/g));
       const result = await emception.worker.run(cmd);
       if (result.returncode == 0) {
         const content = await emception.worker.fileSystem.readFile("/working/main.js", { encoding: "utf8" });
-        console.log(`Compilation succeeded`);
-        console.log(content);
-        (window as any).stdin = "Tolsta";
+        writeLineToConsole("Compilation succeeded");
+        // todo: test all test cases
+        // todo: create ways to pass custom inputs and custom outputs
+        (window as any).stdin = assignment.inputs[0];
         eval(content);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        //await new Promise(resolve => setTimeout(resolve, 1000));
 
-        console.log(`eval succeeded`);
-        console.log((window as any).stdout);
-        console.error((window as any).stderr);
+        writeLineToConsole((window as any).stdout);
       } else {
-        console.log(`Emception compilation failed`);
+        clearConsole();
+        writeLineToConsole(`Emception compilation failed`);
+        writeLineToConsole(result.stderr);
       }
     } catch (err) {
-      console.error(err);
+      clearConsole();
+      writeLineToConsole(`Compilation error`);
+      writeLineToConsole(err);
     } finally {
     }
   }
@@ -235,13 +240,13 @@ var Module = {
     label: `nav ${ index + 1 }`,
   }));
 
-  // const resetCode = () => {
-  //   editorRef.current?.setValue(assignment.initialCode);
-  //   showNotification('Code reset');
-  // }
+  const resetCode = () => {
+    editorRef.current?.setValue(assignment.initialCode);
+    showNotification('Code reset');
+  }
 
   const copyCode = async () => {
-    // await navigator.clipboard.writeText(editorRef.current?.getValue() || '')
+    await navigator.clipboard.writeText(editorRef.current?.getValue() || '')
   }
 
   return (
@@ -281,6 +286,8 @@ var Module = {
                 defaultValue={ assignment.initialCode }
                 onChange={ handleEditorChange }
                 onValidate={ handleEditorValidation }
+                onMount={ handleEditorDidMount }
+                beforeMount={ handleEditorWillMount }
                 options={ { automaticLayout: true, wordWrap: 'on' } }
               />
               <Row justify="space-between">
@@ -290,11 +297,26 @@ var Module = {
                   </Space>
                 </Col>
                 <Col>
-                  {/*<Button type="default" icon={ <UndoOutlined/> } onClick={ resetCode }>Reset code</Button>*/}
+                  <Button type="default" icon={ <UndoOutlined/> } onClick={ resetCode }>Reset code</Button>
                   <Button type="default" icon={ <CopyOutlined/> } onClick={ copyCode }>Copy code</Button>
                 </Col>
               </Row>
-              <TextArea disabled={true} autoSize={{ minRows: 2, maxRows: 6 }} value={consoleOutput}/>
+              <TextArea disabled={true} value={consoleOutput}/>
+              {assignment.inputs.map((input, index) => {
+                return (
+                  <Row key={index}>
+                    <Col>
+                      <Typography.Text strong>Test {index + 1}</Typography.Text>
+                    </Col>
+                    <Col>
+                      <Input value={assignment.inputs[index]} disabled={true}/>
+                    </Col>
+                    <Col>
+                      <Input value={assignment.outputs[index]} disabled={true}/>
+                    </Col>
+                  </Row>
+                );
+              })}
             </Space>
           </div>
         </Content>
